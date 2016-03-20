@@ -16,29 +16,45 @@ import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
  * Created by mark on 20/03/16.
  */
 public class MqttSubscribeSample implements MqttCallback {
+    MqttClient sampleClient;
+    MqttConnectOptions connOpts;
+    String content      = "Message from MqttPublishSample";
+    int qos             = 2;
+    String broker       = "tcp://iot.eclipse.org:1883";
+    String clientId     = "JavaSample";
+    MemoryPersistence persistence = new MemoryPersistence();
+    String topic        = "MQTT Examples";
 
-    public static void main(String[] args) { String topic        = "MQTT Examples";
-        String content      = "Message from MqttPublishSample";
-        int qos             = 2;
-        String broker       = "tcp://iot.eclipse.org:1883";
-        String clientId     = "JavaSample";
-        MemoryPersistence persistence = new MemoryPersistence();
+    public static void main(String[] args) {
+        MqttSubscribeSample MSS = new MqttSubscribeSample();
+        MSS.RunClient();
+    }
 
+
+public void RunClient()
+    {
         try {
-            MqttClient sampleClient = new MqttClient(broker, clientId, persistence);
-            MqttConnectOptions connOpts = new MqttConnectOptions();
+            sampleClient = new MqttClient(broker, clientId, persistence);
+            sampleClient.setCallback(this);
+            connOpts = new MqttConnectOptions();
             connOpts.setCleanSession(true);
             System.out.println("Connecting to broker: "+broker);
             sampleClient.connect(connOpts);
             System.out.println("Connected");
-            System.out.println("Publishing message: "+content);
+            //System.out.println("Publishing message: "+content);
             MqttMessage message = new MqttMessage(content.getBytes());
             message.setQos(qos);
-            sampleClient.publish(topic, message);
-            System.out.println("Message published");
-            sampleClient.disconnect();
-            System.out.println("Disconnected");
-            System.exit(0);
+            //sampleClient.publish(topic, message);
+            sampleClient.subscribe(topic,qos);
+            System.out.println("Message Subscribed");
+            try {
+                // wait to ensure subscribed messages are delivered
+                Thread.sleep(30000);
+                sampleClient.disconnect();
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
         } catch(MqttException me) {
             System.out.println("reason "+me.getReasonCode());
             System.out.println("msg "+me.getMessage());
@@ -47,20 +63,21 @@ public class MqttSubscribeSample implements MqttCallback {
             System.out.println("excep "+me);
             me.printStackTrace();
         }
+
+
     }
+
     public void messageArrived(String topic, MqttMessage message) throws Exception {
-        String time = new Timestamp(System.currentTimeMillis()).toString();
+
         System.out.println("\nReceived a Message!" +
-                "\n\tTime:    " + time +
                 "\n\tTopic:   " + topic +
                 "\n\tMessage: " + new String(message.getPayload()) +
                 "\n\tQoS:     " + message.getQos() + "\n");
-        latch.countDown(); // unblock main thread
+         // unblock main thread
     }
 
     public void connectionLost(Throwable cause) {
         System.out.println("Connection to Solace broker lost!" + cause.getMessage());
-        latch.countDown();
     }
 
     public void deliveryComplete(IMqttDeliveryToken token) {
